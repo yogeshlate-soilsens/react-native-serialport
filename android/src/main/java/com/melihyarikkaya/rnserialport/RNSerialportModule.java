@@ -18,6 +18,7 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.facebook.react.bridge.WritableNativeArray;
 
+import android.os.Bundle;
 import android.util.Base64;
 
 import java.util.ArrayList;
@@ -128,8 +129,12 @@ public class RNSerialportModule extends ReactContextBaseJavaModule {
             stopConnection();
           }
           break;
-        case ACTION_USB_PERMISSION :
-          boolean granted = arg1.getExtras().getBoolean(UsbManager.EXTRA_PERMISSION_GRANTED);
+        case ACTION_USB_PERMISSION:
+          Bundle extras = arg1.getExtras();
+          boolean granted = false;
+          if (extras != null) {
+              granted = extras.getBoolean(UsbManager.EXTRA_PERMISSION_GRANTED, false);
+          }
           startConnection(granted);
           break;
         case ACTION_USB_PERMISSION_GRANTED:
@@ -171,7 +176,12 @@ public class RNSerialportModule extends ReactContextBaseJavaModule {
     filter.addAction(ACTION_USB_PERMISSION);
     filter.addAction(ACTION_USB_ATTACHED);
     filter.addAction(ACTION_USB_DETACHED);
-    reactContext.registerReceiver(mUsbReceiver, filter);
+
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        reactContext.registerReceiver(mUsbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+    } else {
+        reactContext.registerReceiver(mUsbReceiver, filter);
+    }
   }
 
   private void fillDriverList() {
@@ -560,7 +570,15 @@ public class RNSerialportModule extends ReactContextBaseJavaModule {
   private void requestUserPermission() {
     if(device == null)
       return;
-    PendingIntent mPendingIntent = PendingIntent.getBroadcast(reactContext, 0 , new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
+    Intent permissionIntent = new Intent(ACTION_USB_PERMISSION);
+    permissionIntent.setPackage(reactContext.getPackageName());
+
+    PendingIntent mPendingIntent = PendingIntent.getBroadcast(
+        reactContext,
+        0,
+        permissionIntent,
+        PendingIntent.FLAG_IMMUTABLE
+    );
     usbManager.requestPermission(device, mPendingIntent);
   }
 
